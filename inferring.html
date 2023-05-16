@@ -11,7 +11,7 @@
 
 
 
-<title>index.knit</title>
+<title>inferring.knit</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -353,39 +353,366 @@ display: none;
 
 
 <hr />
-<div id="section" class="section level1">
-<h1></h1>
+<div id="section" class="section level2">
+<h2></h2>
 </div>
-<div id="chatgpt-prompt-for-developers" class="section level1">
-<h1>chatGPT PROMPT for Developers</h1>
-<div id="table-of-contents" class="section level2">
-<h2>Table of Contents</h2>
+<div id="inferring" class="section level1">
+<h1>Inferring</h1>
+<p>ChatGPT’s ability to infer positive or negative sentiment in a text
+has several advantages:</p>
+<ol style="list-style-type: decimal">
+<li><p>Enables sentiment analysis without explicitly labeling
+emotions.</p></li>
+<li><p>Provides a quick understanding of the overall tone or sentiment
+of the text.</p></li>
+<li><p>Helps gauge customer feedback, opinions, or reviews
+efficiently.</p></li>
+<li><p>Facilitates sentiment-based recommendation systems.</p></li>
+<li><p>Enhances the contextual understanding of conversations, aiding in
+more accurate responses.</p></li>
+</ol>
+<p>OK let’s start with our environment setup…</p>
+<div id="setup" class="section level3">
+<h3>SETUP</h3>
+<pre class="python"><code>import openai
+import os
+
+from dotenv import load_dotenv, find_dotenv
+_ = load_dotenv(find_dotenv()) # read local .env file
+
+openai.api_key  = os.getenv(&#39;OPENAI_API_KEY&#39;)</code></pre>
+<p>a function to handle the prompt and response:</p>
+<pre class="python"><code>def get_completion(prompt, model=&quot;gpt-3.5-turbo&quot;):
+    messages = [{&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: prompt}]
+    response = openai.ChatCompletion.create(
+        model=model,
+        messages=messages,
+        temperature=0, # this is the degree of randomness of the model&#39;s output
+    )
+    return response.choices[0].message[&quot;content&quot;]</code></pre>
+<p>Ok, let’s see how this works. In our example we will use a review for
+a lamp. So need a nice lamp for the bedroom, and this one additional
+storage, and so on. So let’s write a prompt to classify the sentiment of
+this.</p>
+<p>let’s write our review:</p>
+<pre class="python"><code>lamp_review = &quot;&quot;&quot;
+Needed a nice lamp for my bedroom, and this one had \
+additional storage and not too high of a price point. \
+Got it fast.  The string to our lamp broke during the \
+transit and the company happily sent over a new one. \
+Came within a few days as well. It was easy to put \
+together.  I had a missing part, so I contacted their \
+support and they very quickly got me the missing piece! \
+Lumina seems to me to be a great company that cares \
+about their customers and products!!
+&quot;&quot;&quot;</code></pre>
+<p>OK, now let’s see the sentiment:</p>
 </div>
-<div id="prompt-fundamentals." class="section level2">
-<h2><a href="prompt_fundamentals.html">1.- Prompt Fundamentals.</a></h2>
+<div id="sentiment-positivenegative" class="section level2">
+<h2><strong>Sentiment (positive/negative)</strong></h2>
+<pre class="python"><code>prompt = f&quot;&quot;&quot;
+What is the sentiment of the following product review, 
+which is delimited with triple backticks?
+
+Review text: &#39;&#39;&#39;{lamp_review}&#39;&#39;&#39;
+&quot;&quot;&quot;
+response = get_completion(prompt)
+print(response)</code></pre>
+<p>Output:</p>
+<blockquote>
+<p>The sentiment of the product review is positive.</p>
+</blockquote>
+<p>Nice!, Now in a single word please!</p>
+<pre class="python"><code>prompt = f&quot;&quot;&quot;
+What is the sentiment of the following product review, 
+which is delimited with triple backticks?
+
+Give your answer as a single word, either &quot;positive&quot; \
+or &quot;negative&quot;.
+
+Review text: &#39;&#39;&#39;{lamp_review}&#39;&#39;&#39;
+&quot;&quot;&quot;
+response = get_completion(prompt)
+print(response)</code></pre>
+<p>Output:</p>
+<blockquote>
+<p>positive</p>
+</blockquote>
+<p>Ok, very good, but... what kind of positive emotions? Can we
+investigate further? Let’s see...</p>
 </div>
-<div id="iterative-prompts." class="section level2">
-<h2><a href="iterative_prompts.html">2.- Iterative Prompts.</a></h2>
+<div id="identify-types-of-emotions" class="section level2">
+<h2><strong>Identify types of emotions</strong></h2>
+<pre class="python"><code>prompt = f&quot;&quot;&quot;
+Identify a list of emotions that the writer of the \
+following review is expressing. Include no more than \
+five items in the list. Format your answer as a list of \
+lower-case words separated by commas.
+
+Review text: &#39;&#39;&#39;{lamp_review}&#39;&#39;&#39;
+&quot;&quot;&quot;
+response = get_completion(prompt)
+print(response)</code></pre>
+<p>Output:</p>
+<blockquote>
+<p>happy, satisfied, grateful, impressed, content</p>
+</blockquote>
+<p>So, large language models are pretty good at extracting specific
+things out of a piece of text. In this case, we’re expressing the
+emotions. And this could be useful for understanding how your customers
+think about a particular product.</p>
 </div>
-<div id="summarizing." class="section level2">
-<h2><a href="summarizing.html">3.- Summarizing.</a></h2>
+<div id="identify-anger" class="section level2">
+<h2><strong>Identify anger</strong></h2>
+<p>In this example we only have 4 reviews, but in the case of thousands,
+those that express some negative sentiment may go unnoticed. We can dig
+a little more... because if someone is really angry, it might merit
+paying extra attention to have a customer review, to have
+customer support or customer success, reach out to figure what’s going
+on and make things right for the customer.</p>
+<pre class="python"><code>prompt = f&quot;&quot;&quot;
+Is the writer of the following review expressing anger?\
+The review is delimited with triple backticks. \
+Give your answer as either yes or no.
+
+Review text: &#39;&#39;&#39;{lamp_review}&#39;&#39;&#39;
+&quot;&quot;&quot;
+response = get_completion(prompt)
+print(response)</code></pre>
+<p>Output:</p>
+<blockquote>
+<p>No</p>
+</blockquote>
 </div>
-<div id="inferring." class="section level2">
-<h2><a href="inferring.html">4.- Inferring.</a></h2>
+<div id="extracting-more" class="section level2">
+<h2>Extracting more</h2>
+<p>This system can do more things, such as getting more information from
+a customer review. Information extraction is a part of NLP, or natural
+language processing, that involves taking a piece of text and getting
+certain things that you want to know from the text. In this prompt, I&#39;m
+asking it to find the following items: the item bought and the name of
+the company that made the item. This can be useful if you want to
+summarize many reviews from an online shopping website and see what were
+the items, who made them, and how positive or negative the customers
+felt about them. You can also see how the sentiment changes for
+different items or different brands. In this example, I&#39;m going to ask
+it to write your answer as a JSON object with item and brand as the
+keys.</p>
+<pre class="python"><code>prompt = f&quot;&quot;&quot;
+Identify the following items from the review text: 
+- Item purchased by reviewer
+- Company that made the item
+
+The review is delimited with triple backticks. \
+Format your response as a JSON object with \
+&quot;Item&quot; and &quot;Brand&quot; as the keys. 
+If the information isn&#39;t present, use &quot;unknown&quot; \
+as the value.
+Make your response as short as possible.
+  
+Review text: &#39;&#39;&#39;{lamp_review}&#39;&#39;&#39;
+&quot;&quot;&quot;
+response = get_completion(prompt)
+print(response)</code></pre>
+<p>Output:</p>
+<blockquote>
+<p>{</p>
+<p>  “Item”: “lamp”,</p>
+<p>  “Brand”: “Lumina”</p>
+<p>}</p>
+</blockquote>
+<p>great response!</p>
 </div>
-<div id="transforming." class="section level2">
-<h2>5.- Transforming.</h2>
+<div id="multiple-task-prompt" class="section level2">
+<h2>Multiple task prompt</h2>
+<p>This is very important and useful, we can actually use one prompt to
+get all of this information at once. For example, find the five items,
+get the sentiment, and if the reviewer is angry, the item bought, and
+how well it was made. Here, we are also going to tell it to write the
+anger value as a boolean value.</p>
+<pre class="python"><code>prompt = f&quot;&quot;&quot;
+Identify the following items from the review text: 
+- Sentiment (positive or negative)
+- Is the reviewer expressing anger? (true or false)
+- Item purchased by reviewer
+- Company that made the item
+
+The review is delimited with triple backticks. \
+Format your response as a JSON object with \
+&quot;Sentiment&quot;, &quot;Anger&quot;, &quot;Item&quot; and &quot;Brand&quot; as the keys.
+If the information isn&#39;t present, use &quot;unknown&quot; \
+as the value.
+Make your response as short as possible.
+Format the Anger value as a boolean.
+
+Review text: &#39;&#39;&#39;{lamp_review}&#39;&#39;&#39;
+&quot;&quot;&quot;
+response = get_completion(prompt)
+print(response)</code></pre>
+<p>Output:</p>
+<blockquote>
+<p>{</p>
+<p>  “Sentiment”: “positive”,</p>
+<p>  “Anger”: false,</p>
+<p>  “Item”: “lamp with additional storage”,</p>
+<p>  “Brand”: “Lumina”</p>
+<p>}</p>
+</blockquote>
+<p>When we run this, it gives us a JSON, where sentiment is positive,
+anger is false without quotes because we asked it to write it as a
+boolean value. we got the item as a lamp with extra storage instead of
+just lamp. That&#39;s fine, but this way we can get multiple fields from a
+piece of text with just one prompt !.</p>
 </div>
-<div id="expanding." class="section level2">
-<h2>6.- Expanding.</h2>
+<div id="inferring-topics" class="section level2">
+<h2>Inferring topics</h2>
+<p>One of the interesting uses of Large language models is finding
+topics. For a long piece of text, what is it talking about? What are the
+topics? Here is a made-up newspaper article about how people who work
+for the government feel about their agency.</p>
+<p>Let’s see this in action!</p>
+<pre class="python"><code>story = &quot;&quot;&quot;
+In a recent survey conducted by the government, 
+public sector employees were asked to rate their level 
+of satisfaction with the department they work at. 
+The results revealed that NASA was the most popular 
+department with a satisfaction rating of 95%.
+
+One NASA employee, John Smith, commented on the findings, 
+stating, &quot;I&#39;m not surprised that NASA came out on top. 
+It&#39;s a great place to work with amazing people and 
+incredible opportunities. I&#39;m proud to be a part of 
+such an innovative organization.&quot;
+
+The results were also welcomed by NASA&#39;s management team, 
+with Director Tom Johnson stating, &quot;We are thrilled to 
+hear that our employees are satisfied with their work at NASA. 
+We have a talented and dedicated team who work tirelessly 
+to achieve our goals, and it&#39;s fantastic to see that their 
+hard work is paying off.&quot;
+
+The survey also revealed that the 
+Social Security Administration had the lowest satisfaction 
+rating, with only 45% of employees indicating they were 
+satisfied with their job. The government has pledged to 
+address the concerns raised by employees in the survey and 
+work towards improving job satisfaction across all departments.
+&quot;&quot;&quot;</code></pre>
+<div id="infer-5-topics" class="section level3">
+<h3>Infer 5 topics</h3>
+<p>With this prompt, we can determine five topics that are being
+discussed in the text.</p>
+<pre class="python"><code>prompt = f&quot;&quot;&quot;
+Determine five topics that are being discussed in the \
+following text, which is delimited by triple backticks.
+
+Make each item one or two words long. 
+
+Format your response as a list of items separated by commas.
+
+Text sample: &#39;&#39;&#39;{story}&#39;&#39;&#39;
+&quot;&quot;&quot;
+response = get_completion(prompt)
+print(response)</code></pre>
+<p>Output:</p>
+<blockquote>
+<p>government survey, job satisfaction, NASA, Social Security
+Administration, employee concerns</p>
+</blockquote>
+<p><br />
+Let’s make each item one or two words long, format your response in a
+comma-separated list</p>
+<pre class="python"><code>response.split(sep=&#39;,&#39;)</code></pre>
+<p>Output:</p>
+<blockquote>
+<p>[‘government survey’,</p>
+<p> ’ job satisfaction’,</p>
+<p> ’ NASA’,</p>
+<p> ’ Social Security Administration’,</p>
+<p> ’ employee concerns’]</p>
+</blockquote>
 </div>
-<div id="chatbot." class="section level2">
-<h2>7.- Chatbot.</h2>
+<div id="alerts-for-certain-topics" class="section level3">
+<h3>Alerts for certain topics</h3>
+<p>One of the things we can do with large language models is get topics.
+For a long piece of text, what is the main idea? What are the topics?
+Here is a fake newspaper article about how government workers feel about
+their agency. If we have a bunch of articles and get topics, we can also
+use a big language model to help us find different topics. Let’s use a
+different topic list. Let&#39;s say that we are a news website or something,
+and these are the topics we follow: NASA, local government, engineering,
+employee satisfaction, federal government. And let&#39;s say we want to
+figure out, given a news article, which of these topics are in that news
+article.</p>
+<pre class="python"><code>topic_list = [
+    &quot;nasa&quot;, &quot;local government&quot;, &quot;engineering&quot;, 
+    &quot;employee satisfaction&quot;, &quot;federal government&quot;
+]</code></pre>
+<pre class="python"><code>prompt = f&quot;&quot;&quot;
+Determine whether each item in the following list of \
+topics is a topic in the text below, which
+is delimited with triple backticks.
+
+Give your answer as list with 0 or 1 for each topic.\
+
+List of topics: {&quot;, &quot;.join(topic_list)}
+
+Text sample: &#39;&#39;&#39;{story}&#39;&#39;&#39;
+&quot;&quot;&quot;
+response = get_completion(prompt)
+print(response)</code></pre>
+<p>Output:</p>
+<blockquote>
+<p>nasa: 1</p>
+<p>local government: 0</p>
+<p>engineering: 0</p>
+<p>employee satisfaction: 1</p>
+<p>federal government: 1</p>
+</blockquote>
+<p>Let’s put this into a dictionary:</p>
+<pre class="python"><code>topic_dict = {i.split(&#39;: &#39;)[0]: int(i.split(&#39;: &#39;)[1]) for i in response.split(sep=&#39;\n&#39;)}
+if topic_dict[&#39;nasa&#39;] == 1:
+    print(&quot;ALERT: New NASA story!&quot;)</code></pre>
+<p>Output:</p>
+<blockquote>
+<p>ALERT: New NASA story!</p>
+</blockquote>
+<p>This is sometimes called a zero shot learning algorithm because we
+didn’t give it any training data that was labeled. So, that’s zero shot.
+And with just a prompt, it was able to determine which of these topics
+are covered in that news article.</p>
+<p>Excellent, now we know which topics are present in this different
+text!</p>
+<p>So, if we want to make a news alert, for example, to process news,
+and we are really interested in what NASA does. So, if we want to build
+a system that can take this information and put it in a dictionary, and
+whenever there is a NASA news, print alert, new NASA story, we can use
+this to quickly take any article, find out what topics it is about, and
+if the topic has NASA, have it print out alert, new NASA story. Just one
+thing, I use this topic dictionary here. This prompt that I use here is
+not very reliable. If I wanted to make a production system, I would
+probably have it write the answer in JSON format instead of as a list
+because the output of the big language model can be a bit
+unpredictable.</p>
+<p>Well, let’s do it all at once in JSON format too ..</p>
+<pre class="python"><code>import json
+topic_dict = {i.split(&#39;: &#39;)[0]: int(i.split(&#39;: &#39;)[1]) for i in response.split(sep=&#39;\n&#39;)}
+if topic_dict[&#39;nasa&#39;] == 1:
+    json_output = json.dumps(topic_dict)
+    print(json_output)
+    print(&quot;ALERT: New NASA story!&quot;)</code></pre>
+<p>Output:</p>
+<blockquote>
+<p>{“nasa”: 1, “local government”: 0, “engineering”: 0, “employee
+satisfaction”: 1, “federal government”: 1}</p>
+<p>ALERT: New NASA story!</p>
+</blockquote>
+<p>After seeing these examples we can realize the power that these
+languages ​​give us and all the time and work that we can save, of course
+using the appropriate prompts.</p>
+<p><a href="index.html">Table of Contents.</a></p>
+<p>Transforming</p>
 </div>
-<div id="conclusions." class="section level2">
-<h2>8.- Conclusions.</h2>
-<p><span style="color:red">Still in Development….</span>  </p>
-<p><span style="color:red">Still Learning….</span></p>
 </div>
 </div>
 
